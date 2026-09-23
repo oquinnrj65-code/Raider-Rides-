@@ -1,5 +1,5 @@
 import { api } from "./api.js";
-import { shell, card, table, esc, money, toast } from "./ui.js"; import { getAuth, clearAuth, authScreen } from "./auth.js";
+import { shell, card, table, esc, money, toast } from "./ui.js"; import { getAuth, clearAuth, authScreen } from "./auth.js"; import { loadGoogleMaps } from "./google-maps.js";
 
 let refreshTimer;let eventSource;
 
@@ -17,7 +17,7 @@ export async function renderDriver(){
           '<div><strong id="driverName">Driver</strong><div id="driverShiftStatus" class="muted">Loading status…</div></div>'+
           '<button id="onlineButton" class="primary" type="button">Go online</button>'+
         '</div>'+
-        '<div class="driver-note">Go online to receive and accept new ride requests.</div><button id="enableNotifications" class="secondary" type="button">Enable ride notifications</button><div id="notificationStatus" class="muted">Ride alerts are off.</div>'
+        '<div class="driver-note">Go online to receive and accept new ride requests.</div><div id="driverMap" class="gps-map driver-map"></div><button id="driverGps" class="secondary" type="button">Use Google Maps live GPS</button><div id="driverGpsStatus" class="gps-status">Driver GPS off.</div><button id="enableNotifications" class="secondary" type="button">Enable ride notifications</button><div id="notificationStatus" class="muted">Ride alerts are off.</div>'
       )+
       card("Wallet",'<div class="wallet-box"><strong id="walletBalance">$0.00</strong><span>available driver earnings</span><small id="walletShare">80% of completed ride fares</small><div class="wallet-actions"><button id="refreshWallet" class="secondary" type="button">Refresh wallet</button><button id="setupStripe" class="secondary" type="button">Set up payouts</button><button id="withdrawWallet" class="primary" type="button">Withdraw</button></div><div id="stripeStatus" class="muted">Checking payout setup…</div><div id="withdrawForm" class="hidden"><div class="row"><label>Amount<input id="withdrawAmount" type="number" min="1" step="0.01"></label><label>Payment account<input id="withdrawAccount" placeholder="Stripe-connected payout account"></label></div><button id="submitWithdraw" class="primary" type="button">Submit withdrawal</button></div></div>')+card("Active trip",'<div id="activeTrip">No active trip.</div>')+
     '</div>'+
@@ -25,6 +25,8 @@ export async function renderDriver(){
     card("My completed rides",'<div id="completedRides">Loading…</div>')
   );
 
+  initDriverGoogleMap().catch(err=>toast(err.message));
+  async function initDriverGoogleMap(){const maps=await loadGoogleMaps();const {Map}=await maps.importLibrary("maps");const {AdvancedMarkerElement}=await maps.importLibrary("marker");const map=new Map(document.querySelector("#driverMap"),{center:{lat:33.5779,lng:-101.8552},zoom:13,mapTypeControl:false,streetViewControl:false,fullscreenControl:false,gestureHandling:"greedy"});let marker,watchId;const status=$("#driverGpsStatus");$("#driverGps").onclick=()=>{if(!navigator.geolocation){status.textContent="GPS is not supported on this device.";return}status.textContent="Requesting live GPS permission…";if(watchId)navigator.geolocation.clearWatch(watchId);watchId=navigator.geolocation.watchPosition(pos=>{const p={lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:Math.round(pos.coords.accuracy)};window.raiderDriverGps=p;if(!marker)marker=new AdvancedMarkerElement({map,position:{lat:p.lat,lng:p.lng},title:"Driver live location"});else marker.position={lat:p.lat,lng:p.lng};map.setCenter({lat:p.lat,lng:p.lng});map.setZoom(15);status.textContent="Live Google Maps driver GPS: ±"+p.accuracy+" m"},err=>{status.textContent="GPS error: "+err.message},{enableHighAccuracy:true,maximumAge:5000,timeout:10000})};}
   const state={online:false,rides:[],profile:null,wallet:{balance:0}};
   function updateNotificationUI(){
     const b=$("#enableNotifications"),s=$("#notificationStatus");
