@@ -17,18 +17,19 @@ export async function renderDriver(){
         '</div>'+
         '<div class="driver-note">Go online to receive and accept new ride requests.</div>'
       )+
-      card("Active trip",'<div id="activeTrip">No active trip.</div>')+
+      card("Wallet",'<div class="wallet-box"><strong id="walletBalance">$0.00</strong><span>available driver earnings</span><small id="walletShare">80% of completed ride fares</small><div class="wallet-actions"><button id="refreshWallet" class="secondary" type="button">Refresh wallet</button><button id="withdrawWallet" class="primary" type="button">Withdraw</button></div><div id="withdrawForm" class="hidden"><div class="row"><label>Amount<input id="withdrawAmount" type="number" min="1" step="0.01"></label><label>Payment account<input id="withdrawAccount" placeholder="Connected payout account ID"></label></label></div><button id="submitWithdraw" class="primary" type="button">Submit withdrawal</button></div></div>')+card("Active trip",'<div id="activeTrip">No active trip.</div>')+
     '</div>'+
     card("Available rides",'<div class="section-actions"><button id="refreshRides" class="secondary" type="button">Refresh rides</button><span id="lastUpdated" class="muted"></span></div><div id="availableRides">Loading…</div>')+
     card("My completed rides",'<div id="completedRides">Loading…</div>')
   );
 
-  const state={online:false,rides:[],profile:null};
+  const state={online:false,rides:[],profile:null,wallet:{balance:0}};
   const $=s=>document.querySelector(s);
 
+  async function loadWallet(){try{state.wallet=await api.driver.wallet();$("#walletBalance").textContent=money(state.wallet.balance);$("#walletShare").textContent=(state.wallet.driverSharePercent||80)+"% of completed ride fares";}catch(e){$("#walletBalance").textContent="Unavailable";}}
   async function load(){
     try{
-      const [profileData,rideData]=await Promise.all([api.driver.profile(),api.driver.rides()]);
+      const [profileData,rideData]=await Promise.all([api.driver.profile(),api.driver.rides(),loadWallet()]);
       state.profile=profileData||{};
       state.rides=rideData?.rides||rideData||[];
       state.online=!!state.profile.online;
@@ -128,7 +129,7 @@ export async function renderDriver(){
     finally{button.disabled=false}
   };
 
-  $("#refreshRides").onclick=async()=>{await load()};document.querySelector("main").insertAdjacentHTML("afterbegin",'<button id="logout" class="secondary" type="button">Sign out</button>');document.querySelector("#logout").onclick=()=>{clearAuth();renderDriver()};
+  $("#refreshRides").onclick=async()=>{await load()};$("#refreshWallet").onclick=loadWallet;$("#withdrawWallet").onclick=()=>$("#withdrawForm").classList.toggle("hidden");$("#submitWithdraw").onclick=async()=>{const amount=Number($("#withdrawAmount").value),payoutAccount=$("#withdrawAccount").value.trim();try{const x=await api.driver.withdraw(amount,payoutAccount);toast(x.message||"Withdrawal requested");$("#withdrawForm").classList.add("hidden");await loadWallet()}catch(e){toast(e.message)}};document.querySelector("main").insertAdjacentHTML("afterbegin",'<button id="logout" class="secondary" type="button">Sign out</button>');document.querySelector("#logout").onclick=()=>{clearAuth();renderDriver()};
   await load();
   const apiBase=(window.RAIDER_RIDES_API_BASE_URL||"/api").replace(/\\/$/,"");
   try{
