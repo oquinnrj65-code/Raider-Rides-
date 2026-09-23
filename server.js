@@ -1,21 +1,27 @@
-import http from "node:http";import {randomUUID} from "node:crypto";
-const port=process.env.PORT||10000;const rides=[];const drivers=[{id:"d1",name:"Demo Driver",online:true,rating:5}];
-const json=(res,status,data)=>{res.writeHead(status,{"Content-Type":"application/json","Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"Content-Type,Authorization","Access-Control-Allow-Methods":"GET,POST,PATCH,OPTIONS"});res.end(JSON.stringify(data))};
+import http from "node:http";
+import { randomUUID } from "node:crypto";
+import pg from "pg";
+const { Pool } = pg;
+const pool = process.env.DATABASE_URL ? new Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized:false},max:5}) : null;
+const port=process.env.PORT||10000;
+const allowed=(process.env.ALLOWED_ORIGINS||"").split(",").map(x=>x.trim()).filter(Boolean);
+const headers=res=>{const origin=res.reqOrigin;if(!origin||allowed.length===0||allowed.includes(origin))res.setHeader("Access-Control-Allow-Origin",origin||"*");res.setHeader("Vary","Origin");res.setHeader("Access-Control-Allow-Headers","Content-Type,Authorization");res.setHeader("Access-Control-Allow-Methods","GET,POST,PATCH,OPTIONS");res.setHeader("Content-Type","application/json")};
+const json=(res,status,data)=>{headers(res);res.writeHead(status);res.end(JSON.stringify(data))};
 const body=req=>new Promise((resolve,reject)=>{let s="";req.on("data",c=>s+=c);req.on("end",()=>{try{resolve(s?JSON.parse(s):{})}catch(e){reject(e)}})});
-const route=(method,path)=>{const p=path.replace(/\/$/,"");return{method,path:p}};
-const app=async(req,res)=>{if(req.method==="OPTIONS")return json(res,204,{});const {method,path}=route(req.method,req.url.split("?")[0]);try{
-if(method==="GET"&&path==="/api/health")return json(res,200,{ok:true,service:"raider-rides-api"});
+async function init(){if(!pool)return;await pool.query(`CREATE TABLE IF NOT EXISTS rides(id uuid PRIMARY KEY,rider_id text NOT NULL,driver_id text,status text NOT NULL,pickup text NOT NULL,destination text NOT NULL,ride_type text NOT NULL,passengers int NOT NULL,fare numeric(10,2) NOT NULL DEFAULT 0,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());CREATE TABLE IF NOT EXISTS drivers(id text PRIMARY KEY,name text NOT NULL,online boolean NOT NULL DEFAULT false,rating numeric(3,2) NOT NULL DEFAULT 5,today_earnings numeric(10,2) NOT NULL DEFAULT 0,completed_today int NOT NULL DEFAULT 0);`);await pool.query("INSERT INTO drivers(id,name,online) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",["d1","Demo Driver",true])}
+async function q(sql,args=[]){if(!pool)throw new Error("DATABASE_URL is not configured");return pool.query(sql,args)}
+async function app(req,res){res.reqOrigin=req.headers.origin;if(req.method==="OPTIONS"){headers(res);return res.writeHead(204).end()}const method=req.method,path=req.url.split("?")[0].replace(/\/$/,"");try{
+if(method==="GET"&&path==="/api/health")return json(res,200,{ok:true,service:"raider-rides-api",database:!!pool});
 if(method==="GET"&&path==="/api/rider/profile")return json(res,200,{name:"Demo Rider"});
-if(method==="GET"&&path==="/api/rider/rides")return json(res,200,{rides:rides.filter(r=>r.riderId==="demo")});
+if(method==="GET"&&path==="/api/rider/rides"){const r=await q("SELECT id,rider_id as \"riderId\",driver_id as \"driverId\",status,pickup,destination,ride_type as \"rideType\",passengers,fare,created_at as \"createdAt\" FROM rides WHERE rider_id=$1 ORDER BY created_at DESC LIMIT 50",["demo"]);return json(res,200,{rides:r.rows})}
 if(method==="POST"&&path==="/api/rides/estimate"){const b=await body(req);const fare=12+Math.max(0,String(b.pickup||"").length+String(b.destination||"").length)*.18+(b.rideType==="xl"?7:b.rideType==="premium"?12:0);return json(res,200,{fare:Number(fare.toFixed(2)),estimatedFare:Number(fare.toFixed(2)),durationMinutes:15})}
-if(method==="POST"&&path==="/api/rides"){const b=await body(req);const ride={id:randomUUID(),riderId:"demo",status:"requested",pickup:b.pickup,destination:b.destination,rideType:b.rideType||"standard",passengers:b.passengers||1,fare:0,createdAt:new Date().toISOString()};rides.unshift(ride);return json(res,201,ride)}
-if(method==="GET"&&path==="/api/driver/profile")return json(res,200,{name:drivers[0].name,todayEarnings:0,completedToday:0,rating:drivers[0].rating});
-if(method==="GET"&&path==="/api/driver/rides")return json(res,200,{rides});
-if(method==="PATCH"&&path==="/api/driver/status"){const b=await body(req);drivers[0].online=!!b.online;return json(res,200,{online:drivers[0].online})}
-if(method==="GET"&&path==="/api/admin/stats")return json(res,200,{activeRides:rides.filter(r=>!["completed","cancelled"].includes(r.status)).length,driversOnline:drivers.filter(d=>d.online).length,ridesToday:rides.length,revenueToday:rides.reduce((n,r)=>n+Number(r.fare||0),0)});
-if(method==="GET"&&path==="/api/admin/rides")return json(res,200,{rides});
-if(method==="GET"&&path==="/api/admin/drivers")return json(res,200,{drivers});
-const m=path.match(/^\/api\/driver\/rides\/([^/]+)\/(accept|complete)$/);if(method==="POST"&&m){const r=rides.find(x=>x.id===m[1]);if(!r)return json(res,404,{message:"Ride not found"});r.status=m[2]==="accept"?"accepted":"completed";if(m[2]==="accept")r.driverId="d1";return json(res,200,r)}
-return json(res,404,{message:"Not found"});
-}catch(e){return json(res,500,{message:e.message})}};
-http.createServer(app).listen(port,()=>console.log("Raider Rides API listening on "+port));
+if(method==="POST"&&path==="/api/rides"){const b=await body(req);if(!b.pickup||!b.destination)return json(res,400,{message:"Pickup and destination are required"});const fare=12+Math.max(0,String(b.pickup).length+String(b.destination).length)*.18+(b.rideType==="xl"?7:b.rideType==="premium"?12:0);const id=randomUUID();const r=await q("INSERT INTO rides(id,rider_id,status,pickup,destination,ride_type,passengers,fare) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,status,pickup,destination,ride_type as \"rideType\",passengers,fare,created_at as \"createdAt\"",[id,"demo","requested",b.pickup,b.destination,b.rideType||"standard",Number(b.passengers)||1,Number(fare.toFixed(2))]);return json(res,201,r.rows[0])}
+if(method==="GET"&&path==="/api/driver/profile"){const r=await q("SELECT name,today_earnings as \"todayEarnings\",completed_today as \"completedToday\",rating,online FROM drivers WHERE id=$1",["d1"]);return json(res,200,r.rows[0]||{})}
+if(method==="GET"&&path==="/api/driver/rides"){const r=await q("SELECT id,rider_id as \"riderId\",driver_id as \"driverId\",status,pickup,destination,ride_type as \"rideType\",passengers,fare,created_at as \"createdAt\" FROM rides WHERE status='requested' OR driver_id=$1 ORDER BY created_at DESC LIMIT 100",["d1"]);return json(res,200,{rides:r.rows})}
+if(method==="PATCH"&&path==="/api/driver/status"){const b=await body(req);const r=await q("UPDATE drivers SET online=$1 WHERE id=$2 RETURNING online",[!!b.online,"d1"]);return json(res,200,{online:r.rows[0].online})}
+if(method==="GET"&&path==="/api/admin/stats"){const r=await q("SELECT count(*) FILTER(WHERE status NOT IN('completed','cancelled')) active,count(*) rides,sum(fare) revenue FROM rides WHERE created_at::date=CURRENT_DATE");const d=await q("SELECT count(*) FILTER(WHERE online) online FROM drivers");return json(res,200,{activeRides:Number(r.rows[0].active||0),driversOnline:Number(d.rows[0].online||0),ridesToday:Number(r.rows[0].rides||0),revenueToday:Number(r.rows[0].revenue||0)})}
+if(method==="GET"&&path==="/api/admin/rides"){const r=await q("SELECT id,rider_id as \"riderId\",driver_id as \"driverId\",status,pickup,destination,ride_type as \"rideType\",passengers,fare,created_at as \"createdAt\" FROM rides ORDER BY created_at DESC LIMIT 200");return json(res,200,{rides:r.rows})}
+if(method==="GET"&&path==="/api/admin/drivers"){const r=await q("SELECT id,name,online,rating,today_earnings as \"todayEarnings\",completed_today as \"completedToday\" FROM drivers ORDER BY name");return json(res,200,{drivers:r.rows})}
+const m=path.match(/^\/api\/driver\/rides\/([^/]+)\/(accept|complete)$/);if(method==="POST"&&m){const id=m[1],action=m[2];const r=action==="accept"?await q("UPDATE rides SET status='accepted',driver_id='d1',updated_at=now() WHERE id=$1 AND status='requested' RETURNING *",[id]):await q("UPDATE rides SET status='completed',updated_at=now() WHERE id=$1 AND driver_id='d1' RETURNING *",[id]);if(!r.rows[0])return json(res,404,{message:"Ride not found or unavailable"});if(action==="complete")await q("UPDATE drivers SET completed_today=completed_today+1,today_earnings=today_earnings+$1 WHERE id='d1'",[r.rows[0].fare]);return json(res,200,r.rows[0])}
+return json(res,404,{message:"Not found"})}catch(e){console.error(e);return json(res,500,{message:"Internal server error"})}}
+await init();http.createServer(app).listen(port,()=>console.log("Raider Rides API listening on "+port));
