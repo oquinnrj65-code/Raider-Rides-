@@ -41,6 +41,11 @@ export async function renderDriver(){
     }
   }
 
+  function navigate(destination){
+    const url="https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(destination||"");
+    window.open(url,"_blank","noopener,noreferrer");
+  }
+
   function render(){
     const profile=state.profile||{};
     $("#driverName").textContent=profile.name||"Driver";
@@ -64,6 +69,8 @@ export async function renderDriver(){
           '<div class="trip-meta"><span>'+esc(active.rideType||"standard").toUpperCase()+'</span><span>'+esc(active.passengers||1)+' passenger(s)</span><strong>'+money(active.fare)+'</strong></div>'+
           '<button id="completeActive" class="primary" type="button">Complete ride</button>'+
         '</div>';
+      $("#navPickup").onclick=()=>navigate(active.pickup);
+      $("#navDropoff").onclick=()=>navigate(active.destination);
       $("#completeActive").onclick=async()=>{
         const button=$("#completeActive");
         button.disabled=true;
