@@ -17,7 +17,7 @@ export async function renderDriver(){
           '<div><strong id="driverName">Driver</strong><div id="driverShiftStatus" class="muted">Loading status…</div></div>'+
           '<button id="onlineButton" class="primary" type="button">Go online</button>'+
         '</div>'+
-        '<div class="driver-note">Go online to receive and accept new ride requests.</div>'
+        '<div class="driver-note">Go online to receive and accept new ride requests.</div><button id="enableNotifications" class="secondary" type="button">Enable ride notifications</button><div id="notificationStatus" class="muted">Ride alerts are off.</div>'
       )+
       card("Wallet",'<div class="wallet-box"><strong id="walletBalance">$0.00</strong><span>available driver earnings</span><small id="walletShare">80% of completed ride fares</small><div class="wallet-actions"><button id="refreshWallet" class="secondary" type="button">Refresh wallet</button><button id="setupStripe" class="secondary" type="button">Set up payouts</button><button id="withdrawWallet" class="primary" type="button">Withdraw</button></div><div id="stripeStatus" class="muted">Checking payout setup…</div><div id="withdrawForm" class="hidden"><div class="row"><label>Amount<input id="withdrawAmount" type="number" min="1" step="0.01"></label><label>Payment account<input id="withdrawAccount" placeholder="Stripe-connected payout account"></label></div><button id="submitWithdraw" class="primary" type="button">Submit withdrawal</button></div></div>')+card("Active trip",'<div id="activeTrip">No active trip.</div>')+
     '</div>'+
@@ -26,6 +26,29 @@ export async function renderDriver(){
   );
 
   const state={online:false,rides:[],profile:null,wallet:{balance:0}};
+  function updateNotificationUI(){
+    const b=$("#enableNotifications"),s=$("#notificationStatus");
+    if(!b||!s)return;
+    if(!("Notification" in window)){b.disabled=true;s.textContent="Browser notifications are not supported."}
+    else if(Notification.permission==="granted"){b.disabled=true;b.textContent="Notifications enabled";s.textContent="You'll be alerted when a new ride request arrives."}
+    else if(Notification.permission==="denied"){b.disabled=true;s.textContent="Notifications are blocked in browser settings."}
+    else{s.textContent="Tap Enable ride notifications to allow alerts."}
+  }
+  async function enableNotifications(){
+    if(!("Notification" in window)){toast("Browser notifications are not supported.");return}
+    const permission=await Notification.requestPermission();
+    updateNotificationUI();
+    if(permission==="granted")toast("Ride notifications enabled");
+  }
+  function notifyNewRide(ride){
+    const title="Raider Rides • New ride match";
+    const body=(ride?.pickup||"Pickup")+" → "+(ride?.destination||"Destination")+" • "+money(ride?.fare);
+    if("Notification" in window&&Notification.permission==="granted"){
+      try{const n=new Notification(title,{body,tag:"raider-ride-"+(ride?.id||Date.now()),renotify:true});n.onclick=()=>{window.focus();n.close()}}catch{}
+    }
+    try{const ctx=new (window.AudioContext||window.webkitAudioContext)();const osc=ctx.createOscillator();const gain=ctx.createGain();osc.frequency.value=880;gain.gain.value=.08;osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+.35)}catch{}
+    if(navigator.vibrate)navigator.vibrate([180,80,180]);
+  }
   const $=s=>document.querySelector(s);
 
   async function loadWallet(){try{state.wallet=await api.driver.wallet();$("#walletBalance").textContent=money(state.wallet.balance);$("#walletShare").textContent=(state.wallet.driverSharePercent||80)+"% of completed ride fares";}catch(e){$("#walletBalance").textContent="Unavailable"}try{const s=await api.driver.stripeStatus();$("#stripeStatus").textContent=!s.configured?"Stripe payouts not configured on Raider Rides.":s.connected?(s.payoutsEnabled?"Stripe payouts ready • 80% driver share": "Stripe connected • verification still required"):"Stripe payout setup required."}catch(e){$("#stripeStatus").textContent="Payout setup unavailable."}}
@@ -106,6 +129,8 @@ export async function renderDriver(){
     ):'<div class="empty">No completed rides yet.</div>';
   }
 
+  $("#enableNotifications").onclick=enableNotifications;
+  updateNotificationUI();
   $("#onlineButton").onclick=async()=>{
     const next=!state.online;
     const button=$("#onlineButton");
@@ -128,7 +153,7 @@ export async function renderDriver(){
     eventSource.onmessage=async event=>{
       try{
         const data=JSON.parse(event.data);
-        if(data.type==="ride.created"){toast("New ride request");await load()}
+        if(data.type==="ride.created"){notifyNewRide(data.ride);toast("New ride request");await load()}
         else if(data.type==="ride.accepted"||data.type==="ride.completed"){await load()}
       }catch{}
     };
