@@ -1,5 +1,5 @@
 import { api } from "./api.js";
-import { shell, card, table, esc, money, toast } from "./ui.js";
+import { shell, card, table, esc, money, toast } from "./ui.js"; import { getAuth, clearAuth, authScreen } from "./auth.js";
 
 let refreshTimer;let eventSource;
 
@@ -60,7 +60,7 @@ export async function renderDriver(){
       ["Shift",state.online?"ONLINE":"OFFLINE"]
     ].map(([label,value])=>'<div class="stat"><b>'+esc(value)+'</b>'+esc(label)+'</div>').join("");
 
-    const active=state.rides.find(r=>r.driverId==="d1"&&r.status==="accepted");
+    const active=state.rides.find(r=>r.driverId===state.profile?.id&&r.status==="accepted");
     if(active){
       $("#activeTrip").innerHTML=
         '<div class="trip-card">'+
@@ -128,11 +128,11 @@ export async function renderDriver(){
     finally{button.disabled=false}
   };
 
-  $("#refreshRides").onclick=async()=>{await load()};
+  $("#refreshRides").onclick=async()=>{await load()};document.querySelector("main").insertAdjacentHTML("afterbegin",'<button id="logout" class="secondary" type="button">Sign out</button>');document.querySelector("#logout").onclick=()=>{clearAuth();renderDriver()};
   await load();
   const apiBase=(window.RAIDER_RIDES_API_BASE_URL||"/api").replace(/\\/$/,"");
   try{
-    eventSource=new EventSource(apiBase+"/driver/events");
+    eventSource=new EventSource(apiBase+"/driver/events?token="+encodeURIComponent(localStorage.getItem("raiderRidesToken")||""));
     eventSource.onopen=()=>{const s=$("#driverShiftStatus");if(state.online)s.textContent="Online • live ride alerts connected"};
     eventSource.onmessage=async event=>{
       try{
