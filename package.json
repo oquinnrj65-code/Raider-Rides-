@@ -1,0 +1,1 @@
+{"name":"raider-rides-web","private":true,"version":"1.0.0","type":"module","scripts":{"test":"node --check src/main.js && node --check src/api.js && node --check src/ui.js && node --check src/rider.js && node --check src/driver.js && node --check src/admin.js","start":"vite --host 0.0.0.0"},"devDependencies":{"vite":"^7.1.0"}}
