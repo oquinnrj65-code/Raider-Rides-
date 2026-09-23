@@ -83,17 +83,7 @@ export async function renderDriver(){
     }
 
     const available=state.rides.filter(r=>r.status==="requested"&&!r.driverId);
-    $("#availableRides").innerHTML=available.length?table(
-      ["Pickup","Destination","Type","Passengers","Fare","Action"],
-      available.map(r=>[
-        esc(r.pickup),
-        esc(r.destination),
-        esc((r.rideType||"standard").toUpperCase()),
-        esc(r.passengers||1),
-        money(r.fare),
-        '<button class="small accept-ride" data-id="'+esc(r.id)+'" type="button">Accept</button>'
-      ])
-    ):'<div class="empty">'+(state.online?"No new ride requests right now.":"Go online to receive ride requests.")+'</div>';
+    $("#availableRides").innerHTML=available.length?available.map(r=>'<div class="ride-request"><div class="ride-route"><strong>'+esc(r.pickup)+'</strong><span>→</span><strong>'+esc(r.destination)+'</strong></div><div class="ride-request-meta"><span>'+esc((r.rideType||"standard").toUpperCase())+'</span><span>'+esc(r.passengers||1)+' passenger(s)</span><strong>'+money(r.fare)+'</strong></div><button class="primary accept-ride" data-id="'+esc(r.id)+'" type="button">Accept ride</button></div>').join(""):'<div class="empty">'+(state.online?"No new ride requests right now.":"Go online to receive ride requests.")+'</div>';
 
     $("#availableRides").querySelectorAll(".accept-ride").forEach(button=>{
       button.onclick=async()=>{
