@@ -5,7 +5,8 @@ export function setAuth(x){localStorage.setItem("raiderRidesAuth",JSON.stringify
 export function clearAuth(){localStorage.removeItem("raiderRidesAuth");localStorage.removeItem("raiderRidesToken")}
 export async function authScreen(role,render){
  const app=document.querySelector("#app");
- app.innerHTML=shell(role==="driver"?"Driver login":"Rider login",role,
+ const title=role==="admin"?"Admin login":role==="driver"?"Driver login":"Rider login";
+ app.innerHTML=shell(title,role,
    card("Raider Rides account",'<form id="authForm" class="form"><label>Email<input id="authEmail" type="email" autocomplete="email" required></label><label>Password<input id="authPassword" type="password" minlength="8" autocomplete="current-password" required></label><label id="nameWrap" class="hidden">Name<input id="authName" autocomplete="name"></label><label id="inviteWrap" class="hidden">Team invite code<input id="inviteToken" autocomplete="off"></label><button id="authSubmit" class="primary" type="submit">Sign in</button></form><button id="toggleAuth" class="secondary" type="button">Create account</button><div id="authMessage" class="gps-status"></div>')
  );
  let register=false;const inviteFromUrl=role==="admin"?new URLSearchParams(location.search).get("invite"):"";if(inviteFromUrl){const invite=document.querySelector("#inviteToken");if(invite)invite.value=inviteFromUrl;}
