@@ -1,10 +1,10 @@
 import { api } from "./api.js";
 import { shell, card, table, esc, money, toast } from "./ui.js";
 
-let refreshTimer;
+let refreshTimer;let eventSource;
 
 export async function renderDriver(){
-  clearInterval(refreshTimer);
+  clearInterval(refreshTimer);if(eventSource){eventSource.close();eventSource=null;}
   const app=document.querySelector("#app");
   app.innerHTML=shell("Driver","driver",
     '<div id="driverError"></div>'+
@@ -130,5 +130,18 @@ export async function renderDriver(){
 
   $("#refreshRides").onclick=async()=>{await load()};
   await load();
-  refreshTimer=setInterval(load,10000);
+  const apiBase=(window.RAIDER_RIDES_API_BASE_URL||"/api").replace(/\\/$/,"");
+  try{
+    eventSource=new EventSource(apiBase+"/driver/events");
+    eventSource.onopen=()=>{const s=$("#driverShiftStatus");if(state.online)s.textContent="Online • live ride alerts connected"};
+    eventSource.onmessage=async event=>{
+      try{
+        const data=JSON.parse(event.data);
+        if(data.type==="ride.created"){toast("New ride request");await load()}
+        else if(data.type==="ride.accepted"||data.type==="ride.completed"){await load()}
+      }catch{}
+    };
+    eventSource.onerror=()=>{const s=$("#driverShiftStatus");if(state.online)s.textContent="Online • reconnecting to live alerts…"};
+  }catch{}
+  refreshTimer=setInterval(load,30000);
 }
