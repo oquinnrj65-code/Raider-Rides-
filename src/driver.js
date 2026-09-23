@@ -131,7 +131,7 @@ export async function renderDriver(){
 
   $("#refreshRides").onclick=async()=>{await load()};$("#refreshWallet").onclick=loadWallet;$("#setupStripe").onclick=async()=>{try{const x=await api.driver.stripeOnboarding();window.location.href=x.url}catch(e){toast(e.message)}};$("#withdrawWallet").onclick=()=>$("#withdrawForm").classList.toggle("hidden");$("#submitWithdraw").onclick=async()=>{const amount=Number($("#withdrawAmount").value),payoutAccount=$("#withdrawAccount").value.trim();try{const x=await api.driver.withdraw(amount,payoutAccount);toast(x.message||"Withdrawal requested");$("#withdrawForm").classList.add("hidden");await loadWallet()}catch(e){toast(e.message)}};document.querySelector("main").insertAdjacentHTML("afterbegin",'<button id="logout" class="secondary" type="button">Sign out</button>');document.querySelector("#logout").onclick=()=>{clearAuth();renderDriver()};
   await load();
-  const apiBase=(window.RAIDER_RIDES_API_BASE_URL||"/api").replace(/\\/$/,"");
+  const apiBase=(window.RAIDER_RIDES_API_BASE_URL||localStorage.getItem("raiderRidesApiBase")||"https://raider-rides-api.onrender.com/api").replace(/\\/$/,"");
   try{
     eventSource=new EventSource(apiBase+"/driver/events?token="+encodeURIComponent(localStorage.getItem("raiderRidesToken")||""));
     eventSource.onopen=()=>{const s=$("#driverShiftStatus");if(state.online)s.textContent="Online • live ride alerts connected"};
