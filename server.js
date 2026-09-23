@@ -9,7 +9,7 @@ const headers=res=>{const origin=res.reqOrigin;if(!origin||allowed.length===0||a
 const json=(res,status,data)=>{headers(res);res.writeHead(status);res.end(JSON.stringify(data))};
 const body=req=>new Promise((resolve,reject)=>{let s="";req.on("data",c=>s+=c);req.on("end",()=>{try{resolve(s?JSON.parse(s):{})}catch(e){reject(e)}})});
 async function init(){if(!pool)return;await pool.query(`CREATE TABLE IF NOT EXISTS rides(id uuid PRIMARY KEY,rider_id text NOT NULL,driver_id text,status text NOT NULL,pickup text NOT NULL,destination text NOT NULL,ride_type text NOT NULL,passengers int NOT NULL,fare numeric(10,2) NOT NULL DEFAULT 0,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());CREATE TABLE IF NOT EXISTS drivers(id text PRIMARY KEY,name text NOT NULL,online boolean NOT NULL DEFAULT false,rating numeric(3,2) NOT NULL DEFAULT 5,today_earnings numeric(10,2) NOT NULL DEFAULT 0,completed_today int NOT NULL DEFAULT 0);`);await pool.query("INSERT INTO drivers(id,name,online) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",["d1","Demo Driver",true])}
-async function q(sql,args=[]){if(!pool)throw new Error("DATABASE_URL is not configured");return pool.query(sql,args)}
+async function q(sql,args=[]){if(pool)return pool.query(sql,args);return {rows:[]}}
 async function app(req,res){res.reqOrigin=req.headers.origin;if(req.method==="OPTIONS"){headers(res);return res.writeHead(204).end()}const method=req.method,path=req.url.split("?")[0].replace(/\/$/,"");try{
 if(method==="GET"&&path==="/api/health")return json(res,200,{ok:true,service:"raider-rides-api",database:!!pool});
 if(method==="GET"&&path==="/api/rider/profile")return json(res,200,{name:"Demo Rider"});
