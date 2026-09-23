@@ -36,7 +36,7 @@ async function initDb(){
  CREATE TABLE IF NOT EXISTS drivers(user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,online boolean NOT NULL DEFAULT false,rating numeric(3,2) NOT NULL DEFAULT 5,today_earnings numeric(12,2) NOT NULL DEFAULT 0,completed_today integer NOT NULL DEFAULT 0,stripe_account_id text);
  ALTER TABLE drivers ADD COLUMN IF NOT EXISTS stripe_account_id text;
  ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
- ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN ('rider','driver','admin'));
+ DO $ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='users_role_check') THEN ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN ('rider','driver','admin')); END IF; END $;
  CREATE TABLE IF NOT EXISTS admin_invites(id uuid PRIMARY KEY,token_hash text UNIQUE NOT NULL,email text,created_by uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,used_at timestamptz,created_at timestamptz NOT NULL DEFAULT now());
  CREATE TABLE IF NOT EXISTS rides(id uuid PRIMARY KEY,rider_id uuid NOT NULL REFERENCES users(id),driver_id uuid REFERENCES users(id),status text NOT NULL,pickup text NOT NULL,destination text NOT NULL,ride_type text NOT NULL,passengers integer NOT NULL,fare numeric(12,2) NOT NULL,payment_method text NOT NULL,payment_status text NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),accepted_at timestamptz,completed_at timestamptz,payment_confirmed_at timestamptz);
  CREATE INDEX IF NOT EXISTS rides_status_idx ON rides(status);
