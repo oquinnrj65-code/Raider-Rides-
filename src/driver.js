@@ -17,7 +17,7 @@ export async function renderDriver(){
         '</div>'+
         '<div class="driver-note">Go online to receive and accept new ride requests.</div>'
       )+
-      card("Wallet",'<div class="wallet-box"><strong id="walletBalance">$0.00</strong><span>available driver earnings</span><small id="walletShare">80% of completed ride fares</small><div class="wallet-actions"><button id="refreshWallet" class="secondary" type="button">Refresh wallet</button><button id="withdrawWallet" class="primary" type="button">Withdraw</button></div><div id="withdrawForm" class="hidden"><div class="row"><label>Amount<input id="withdrawAmount" type="number" min="1" step="0.01"></label><label>Payment account<input id="withdrawAccount" placeholder="Connected payout account ID"></label></label></div><button id="submitWithdraw" class="primary" type="button">Submit withdrawal</button></div></div>')+card("Active trip",'<div id="activeTrip">No active trip.</div>')+
+      card("Wallet",'<div class="wallet-box"><strong id="walletBalance">$0.00</strong><span>available driver earnings</span><small id="walletShare">80% of completed ride fares</small><div class="wallet-actions"><button id="refreshWallet" class="secondary" type="button">Refresh wallet</button><button id="setupStripe" class="secondary" type="button">Set up payouts</button><button id="withdrawWallet" class="primary" type="button">Withdraw</button></div><div id="stripeStatus" class="muted">Checking payout setup…</div><div id="withdrawForm" class="hidden"><div class="row"><label>Amount<input id="withdrawAmount" type="number" min="1" step="0.01"></label><label>Payment account<input id="withdrawAccount" placeholder="Stripe-connected payout account"></label></div><button id="submitWithdraw" class="primary" type="button">Submit withdrawal</button></div></div>')+card("Active trip",'<div id="activeTrip">No active trip.</div>')+
     '</div>'+
     card("Available rides",'<div class="section-actions"><button id="refreshRides" class="secondary" type="button">Refresh rides</button><span id="lastUpdated" class="muted"></span></div><div id="availableRides">Loading…</div>')+
     card("My completed rides",'<div id="completedRides">Loading…</div>')
@@ -26,7 +26,7 @@ export async function renderDriver(){
   const state={online:false,rides:[],profile:null,wallet:{balance:0}};
   const $=s=>document.querySelector(s);
 
-  async function loadWallet(){try{state.wallet=await api.driver.wallet();$("#walletBalance").textContent=money(state.wallet.balance);$("#walletShare").textContent=(state.wallet.driverSharePercent||80)+"% of completed ride fares";}catch(e){$("#walletBalance").textContent="Unavailable";}}
+  async function loadWallet(){try{state.wallet=await api.driver.wallet();$("#walletBalance").textContent=money(state.wallet.balance);$("#walletShare").textContent=(state.wallet.driverSharePercent||80)+"% of completed ride fares";}catch(e){$("#walletBalance").textContent="Unavailable"}try{const s=await api.driver.stripeStatus();$("#stripeStatus").textContent=!s.configured?"Stripe payouts not configured on Raider Rides.":s.connected?(s.payoutsEnabled?"Stripe payouts ready • 80% driver share": "Stripe connected • verification still required"):"Stripe payout setup required."}catch(e){$("#stripeStatus").textContent="Payout setup unavailable."}}
   async function load(){
     try{
       const [profileData,rideData]=await Promise.all([api.driver.profile(),api.driver.rides(),loadWallet()]);
@@ -106,7 +106,7 @@ export async function renderDriver(){
       };
     });
 
-    const completed=state.rides.filter(r=>r.driverId==="d1"&&r.status==="completed");
+    const completed=state.rides.filter(r=>r.driverId===state.profile?.id&&r.status==="completed");
     $("#completedRides").innerHTML=completed.length?table(
       ["Pickup","Destination","Fare","Completed"],
       completed.slice(0,25).map(r=>[
@@ -129,7 +129,7 @@ export async function renderDriver(){
     finally{button.disabled=false}
   };
 
-  $("#refreshRides").onclick=async()=>{await load()};$("#refreshWallet").onclick=loadWallet;$("#withdrawWallet").onclick=()=>$("#withdrawForm").classList.toggle("hidden");$("#submitWithdraw").onclick=async()=>{const amount=Number($("#withdrawAmount").value),payoutAccount=$("#withdrawAccount").value.trim();try{const x=await api.driver.withdraw(amount,payoutAccount);toast(x.message||"Withdrawal requested");$("#withdrawForm").classList.add("hidden");await loadWallet()}catch(e){toast(e.message)}};document.querySelector("main").insertAdjacentHTML("afterbegin",'<button id="logout" class="secondary" type="button">Sign out</button>');document.querySelector("#logout").onclick=()=>{clearAuth();renderDriver()};
+  $("#refreshRides").onclick=async()=>{await load()};$("#refreshWallet").onclick=loadWallet;$("#setupStripe").onclick=async()=>{try{const x=await api.driver.stripeOnboarding();window.location.href=x.url}catch(e){toast(e.message)}};$("#withdrawWallet").onclick=()=>$("#withdrawForm").classList.toggle("hidden");$("#submitWithdraw").onclick=async()=>{const amount=Number($("#withdrawAmount").value),payoutAccount=$("#withdrawAccount").value.trim();try{const x=await api.driver.withdraw(amount,payoutAccount);toast(x.message||"Withdrawal requested");$("#withdrawForm").classList.add("hidden");await loadWallet()}catch(e){toast(e.message)}};document.querySelector("main").insertAdjacentHTML("afterbegin",'<button id="logout" class="secondary" type="button">Sign out</button>');document.querySelector("#logout").onclick=()=>{clearAuth();renderDriver()};
   await load();
   const apiBase=(window.RAIDER_RIDES_API_BASE_URL||"/api").replace(/\\/$/,"");
   try{
