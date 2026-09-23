@@ -4,6 +4,8 @@ import { shell, card, table, esc, money, toast } from "./ui.js"; import { getAut
 let refreshTimer;let eventSource;
 
 export async function renderDriver(){
+  const session=getAuth();
+  if(!session||session.user?.role!=="driver"){clearAuth();return authScreen("driver",renderDriver)}
   clearInterval(refreshTimer);if(eventSource){eventSource.close();eventSource=null;}
   const app=document.querySelector("#app");
   app.innerHTML=shell("Driver","driver",
@@ -70,8 +72,6 @@ export async function renderDriver(){
           '<div class="trip-meta"><span>'+esc(active.rideType||"standard").toUpperCase()+'</span><span>'+esc(active.passengers||1)+' passenger(s)</span><strong>'+money(active.fare)+'</strong></div>'+
           '<button id="completeActive" class="primary" type="button">Complete ride</button>'+
         '</div>';
-      $("#navPickup").onclick=()=>navigate(active.pickup);
-      $("#navDropoff").onclick=()=>navigate(active.destination);
       $("#completeActive").onclick=async()=>{
         const button=$("#completeActive");
         button.disabled=true;
