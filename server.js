@@ -70,6 +70,23 @@ async function creditTipOnce(rideId){if(pool){const r=await q("UPDATE rides SET 
 async function creditPostTipOnce(rideId){if(pool){const r=await q("UPDATE rides SET post_tip_paid_at=now() WHERE id=$1 AND post_tip_amount>0 AND post_tip_paid_at IS NULL AND driver_id IS NOT NULL RETURNING driver_id,post_tip_amount",[rideId]);if(r.rows[0]){await creditWallet(r.rows[0].driver_id,Number(r.rows[0].post_tip_amount),rideId,"driver_tip","100% post-payment driver tip");return Number(r.rows[0].post_tip_amount)}return 0}const r=memory.rides.find(x=>x.id===rideId);if(!r||!r.driverId||!r.postTipAmount||r.postTipPaidAt)return 0;r.postTipPaidAt=new Date().toISOString();const w=await walletInfo(r.driverId);w.balance+=Number(r.postTipAmount);return Number(r.postTipAmount)}
 async function completeDriver(userId,fareValue,rideId){const driverShare=Number((Number(fareValue)*0.80).toFixed(2));if(pool){await q("UPDATE drivers SET completed_today=completed_today+1,today_earnings=today_earnings+$2 WHERE user_id=$1",[userId,driverShare]);await creditWallet(userId,driverShare,rideId,"ride_earnings","80% driver share from completed ride");return driverShare}const d=memory.drivers.get(userId);d.completedToday++;d.todayEarnings+=driverShare;const w=await walletInfo(userId);w.balance+=driverShare;return driverShare}
 
+async function getDriverStripeAccount(userId){
+  if(pool){
+    const r=await q("SELECT stripe_account_id FROM drivers WHERE user_id=$1",[userId]);
+    return r.rows[0]?.stripe_account_id||null;
+  }
+  const d=memory.drivers.get(userId);
+  return d?.stripeAccountId||null;
+}
+async function setDriverStripeAccount(userId,accountId){
+  if(pool){
+    await q("UPDATE drivers SET stripe_account_id=$2 WHERE user_id=$1",[userId,accountId]);
+    return;
+  }
+  const d=memory.drivers.get(userId);
+  if(d)d.stripeAccountId=accountId;
+}
+
 const app=async(req,res)=>{res.reqOrigin=req.headers.origin;if(req.method==="OPTIONS"){send(res,204,{});return}const method=req.method,path=req.url.split("?")[0].replace(/\/$/,"");try{
 if(method==="POST"&&path==="/api/stripe/webhook"){if(!stripe)return send(res,503,{message:"Stripe is not configured"});const sig=req.headers["stripe-signature"];let raw="";for await(const chunk of req)raw+=chunk;let event;try{event=STRIPE_WEBHOOK_SECRET?stripe.webhooks.constructEvent(raw,sig,STRIPE_WEBHOOK_SECRET):JSON.parse(raw)}catch(e){return send(res,400,{message:"Invalid Stripe webhook"})}if(event.type==="checkout.session.completed"){const session=event.data.object;const rideId=session.metadata?.rideId;const kind=session.metadata?.kind||"ride_payment";if(rideId&&kind==="post_tip"){await creditPostTipOnce(rideId)}else if(rideId){const ride=await getRide(rideId);const x=await updateRide(rideId,{paymentStatus:"paid",stripeCheckoutSessionId:session.id,status:ride?.status==="payment_pending"||ride?.status==="requested"?"requested":ride?.status});await creditTipOnce(rideId);if(x?.status==="requested"&&!x.driverId)broadcast({type:"ride.created",ride:x})}}return send(res,200,{received:true})}
 if(method==="GET"&&path==="/api/config/maps"){return send(res,200,{apiKey:process.env.GOOGLE_MAPS_API_KEY||""})}
