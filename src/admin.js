@@ -13,6 +13,7 @@ export async function renderAdmin(){
   const[s,r,d]=await Promise.all([api.admin.stats(),api.admin.rides(),api.admin.drivers()]);
   document.querySelector('#stats').innerHTML=[["Active rides",s.activeRides],["Online drivers",s.driversOnline],["Rides today",s.ridesToday],["Revenue",money(s.revenueToday)]].map(x=>'<div class="stat"><b>'+esc(x[1]??0)+"</b>"+x[0]+"</div>").join("");
   document.querySelector('#adminRides').innerHTML=table(["Status","Rider","Driver","Fare"],(r.rides||r||[]).map(x=>[esc(x.status),esc(x.riderName||"—"),esc(x.driverName||"—"),money(x.fare)]));
-  document.querySelector('#drivers').innerHTML=table(["Driver","Status","Rating"],(d.drivers||d||[]).map(x=>[esc(x.name),x.online?"Online":"Offline",esc(x.rating??"—")]));
+  document.querySelector('#drivers').innerHTML=table(["Driver","Status","Rating","Authorization"],(d.drivers||d||[]).map(x=>[esc(x.name)+(x.email?"<br><small>"+esc(x.email)+"</small>":""),x.online?"Online":"Offline",esc(x.rating??"—"),x.approved?"<span class=\"muted\">Authorized</span>":"<button class=\"primary approve-driver\" data-id=\""+esc(x.id)+"\">Authorize driver</button>"]));
+ document.querySelectorAll(".approve-driver").forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api.admin.setDriverApproval(b.dataset.id,true);toast("Driver authorized");await renderAdmin()}catch(err){b.disabled=false;toast(err.message)}});
  }catch(e){toast(e.message);stats.innerHTML='<div class="empty">Admin API unavailable.</div>'}
 }
