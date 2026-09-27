@@ -60,6 +60,11 @@ export async function renderDriver(){
       state.profile=profileData||{};
       state.rides=rideData?.rides||rideData||[];
       state.online=!!state.profile.online;
+      if(state.profile.approved===false){
+        app.innerHTML=shell("Driver","driver",card("Admin authorization required","<p>Your driver account has been created and is waiting for approval by a Raider Rides administrator.</p><p>You cannot go online or accept rides until an admin authorizes this account.</p><button id=\"logoutPending\" class=\"secondary\" type=\"button\">Sign out</button>"));
+        document.querySelector("#logoutPending").onclick=()=>{clearAuth();renderDriver()};
+        return;
+      }
       render();
       $("#lastUpdated").textContent="Updated "+new Date().toLocaleTimeString();
     }catch(err){
