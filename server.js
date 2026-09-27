@@ -25,7 +25,7 @@ const broadcast=payload=>{const msg="data: "+JSON.stringify(payload)+"\n\n";for(
 const hashPassword=password=>{const salt=randomBytes(16).toString("hex");const hash=scryptSync(password,salt,64).toString("hex");return "scrypt$"+salt+"$"+hash};
 const verifyPassword=(password,stored)=>{try{const [,salt,hex]=stored.split("$");const actual=scryptSync(password,salt,64);const expected=Buffer.from(hex,"hex");return expected.length===actual.length&&timingSafeEqual(actual,expected)}catch{return false}};
 const b64=s=>Buffer.from(s).toString("base64url");
-const tokenFor=(user,sessionRole=user.role)=>{const payload=b64(JSON.stringify({sub:user.id,role:sessionRole,accountRole:user.role,exp:Date.now()+1000*60*60*24*30}));const sig=createHmac("sha256",AUTH_SECRET).update(payload).digest("base64url");return payload+"."+sig};
+const tokenFor=(user,sessionRole=user.role)=>{const payload=b64(JSON.stringify({sub:user.id,role:sessionRole,accountRole:user.role,exp:Date.now()+1000*60*60*24*365}));const sig=createHmac("sha256",AUTH_SECRET).update(payload).digest("base64url");return payload+"."+sig};
 const userFromToken=token=>{try{const [p,s]=String(token||"").split(".");if(!p||!s)return null;const expected=createHmac("sha256",AUTH_SECRET).update(p).digest("base64url");if(!timingSafeEqual(Buffer.from(s),Buffer.from(expected)))return null;const x=JSON.parse(Buffer.from(p,"base64url").toString());return x.exp>Date.now()?x:null}catch{return null}};
 const auth=req=>userFromToken((req.headers.authorization||"").replace(/^Bearer\s+/i,""));
 const requireAuth=(req,res,roles)=>{const u=auth(req);if(!u)return send(res,401,{message:"Login required"});if(roles&&!roles.includes(u.role))return send(res,403,{message:"Access denied"});return u};
