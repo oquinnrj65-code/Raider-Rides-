@@ -1,8 +1,8 @@
 import { api } from "./api.js";
 import { shell, card, esc, toast } from "./ui.js";
-export function getAuth(){try{return JSON.parse(localStorage.getItem("raiderRidesAuth")||"null")}catch{return null}}
-export function setAuth(x){localStorage.setItem("raiderRidesAuth",JSON.stringify(x));localStorage.setItem("raiderRidesToken",x.token)}
-export function clearAuth(){localStorage.removeItem("raiderRidesAuth");localStorage.removeItem("raiderRidesToken")}
+export function getAuth(){try{const raw=localStorage.getItem("raiderRidesAuth");if(raw)return JSON.parse(raw);const m=document.cookie.match(/(?:^|; )raiderRidesAuth=([^;]+)/);if(m)return JSON.parse(decodeURIComponent(m[1]));return null}catch{return null}}
+export function setAuth(x){const raw=JSON.stringify(x);localStorage.setItem("raiderRidesAuth",raw);localStorage.setItem("raiderRidesToken",x.token);document.cookie="raiderRidesAuth="+encodeURIComponent(raw)+"; Max-Age=31536000; Path=/; SameSite=Lax"}
+export function clearAuth(){localStorage.removeItem("raiderRidesAuth");localStorage.removeItem("raiderRidesToken");document.cookie="raiderRidesAuth=; Max-Age=0; Path=/; SameSite=Lax"}
 export async function authScreen(role,render){
  const app=document.querySelector("#app");
  const title=role==="admin"?"Admin login":role==="driver"?"Driver login":"Rider login";
