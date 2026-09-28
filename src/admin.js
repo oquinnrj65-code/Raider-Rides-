@@ -42,9 +42,10 @@ export async function renderAdmin() {
       const email = document.querySelector("#inviteEmail").value.trim();
       const result = await api.admin.invite({ email });
       document.querySelector("#inviteResult").innerHTML =
-        '<strong>Invitation created.</strong><br>Send this link to the team member:<br>' +
+        '<strong>Invitation created.</strong><br>Send this <b>Admin app</b> link to the team member:<br>' +
         '<input value="' + esc(result.inviteUrl || "") + '" readonly onclick="this.select()">' +
-        '<br><small>The invitation can be used once.</small>';
+        '<div class="gps-status"><b>One-time admin code:</b><br><input value="' + esc(result.inviteCode || result.inviteToken || "") + '" readonly onclick="this.select()"></div>' +
+        '<small>This code works once. The invitation link opens the Admin app and carries the same one-time code automatically.</small>';
     } catch (err) {
       toast(err.message);
     } finally {
