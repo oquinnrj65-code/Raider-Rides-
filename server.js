@@ -12,7 +12,7 @@ const RIDER_APP_URL=(process.env.RIDER_APP_URL||"https://raider-rides-rider.onre
 const DRIVER_APP_URL=(process.env.DRIVER_APP_URL||"https://raider-rides-driver.onrender.com").replace(/\/$/,"");
 const ADMIN_APP_URL=(process.env.ADMIN_APP_URL||"https://raider-rides-admin.onrender.com").replace(/\/$/,"");
 const DATABASE_URL=process.env.DATABASE_URL||"";
-const ADMIN_OWNER_EMAIL=(process.env.ADMIN_OWNER_EMAIL||"").trim().toLowerCase();
+const ADMIN_OWNER_EMAIL=(process.env.ADMIN_OWNER_EMAIL||"oquinnrj65@gmail.com").trim().toLowerCase();
 const pool=DATABASE_URL?new Pool({connectionString:DATABASE_URL,max:10,idleTimeoutMillis:30000,connectionTimeoutMillis:5000,ssl:/sslmode=require/i.test(DATABASE_URL)?{rejectUnauthorized:false}:undefined}):null;
 const memory={users:new Map(),rides:[],drivers:new Map()};
 const driverStreams=new Set();
