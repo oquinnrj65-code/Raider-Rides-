@@ -17,6 +17,11 @@ try {
           "SELECT u.id,u.name,u.email,COALESCE(d.online,false) AS online,COALESCE(d.rating,5) AS rating,COALESCE(d.today_earnings,0) AS today_earnings,COALESCE(d.completed_today,0) AS completed_today,COALESCE(d.approved,false) AS approved,d.license_plate,d.license_document,d.insurance_document FROM users u LEFT JOIN drivers d ON d.user_id=u.id WHERE u.role='driver' ORDER BY u.name"
         );
       }
+      // Richard OQuinn is the Raider Rides owner and must remain an approved driver.
+      // This only changes this one owner's driver record and does not alter other drivers.
+      if (out.includes("CREATE TABLE IF NOT EXISTS users(")) {
+        out += "\nUPDATE drivers d SET approved=true, approved_at=COALESCE(d.approved_at,now()) FROM users u WHERE d.user_id=u.id AND lower(u.email)='oquinnrj65@gmail.com' AND u.role='driver';";
+      }
       return out;
     };
     if (typeof config === "string") config = patchText(config);
