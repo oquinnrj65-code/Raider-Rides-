@@ -11,14 +11,16 @@ try {
       if (out.includes("FROM users u JOIN drivers d ON d.user_id=u.id ORDER BY u.name")) {
         out = out.replace(
           "SELECT u.id,u.name,u.email,d.online,d.rating,d.today_earnings,d.completed_today,d.approved,d.license_plate,d.license_document,d.insurance_document FROM users u JOIN drivers d ON d.user_id=u.id ORDER BY u.name",
-          "SELECT u.id,u.name,u.email,COALESCE(d.online,false) AS online,COALESCE(d.rating,5) AS rating,COALESCE(d.today_earnings,0) AS today_earnings,COALESCE(d.completed_today,0) AS completed_today,COALESCE(d.approved,false) AS approved,d.license_plate,d.license_document,d.insurance_document FROM users u LEFT JOIN drivers d ON d.user_id=u.id WHERE u.role='driver' ORDER BY u.name"
+          "SELECT u.id,u.name,u.email,COALESCE(d.online,false) AS online,COALESCE(d.rating,5) AS rating,COALESCE(d.today_earnings,0) AS today_earnings,COALESCE(d.completed_today,0) AS completed_today,CASE WHEN lower(u.email)='oquinnrj65@gmail.com' THEN true ELSE COALESCE(d.approved,false) END AS approved,d.license_plate,d.license_document,d.insurance_document FROM users u LEFT JOIN drivers d ON d.user_id=u.id WHERE u.role='driver' ORDER BY u.name"
         );
       }
       // The Driver app relies on profile.approved to decide whether access is allowed.
+      // Richard OQuinn is the owner driver and must remain approved even if an older
+      // driver row is missing or still carries the old pending value.
       if (out.includes("SELECT u.id,u.name,u.email,u.role,d.online,d.rating,d.today_earnings,d.completed_today FROM users u LEFT JOIN drivers d ON d.user_id=u.id WHERE u.id=$1")) {
         out = out.replace(
           "SELECT u.id,u.name,u.email,u.role,d.online,d.rating,d.today_earnings,d.completed_today FROM users u LEFT JOIN drivers d ON d.user_id=u.id WHERE u.id=$1",
-          "SELECT u.id,u.name,u.email,u.role,d.online,d.rating,d.today_earnings,d.completed_today,COALESCE(d.approved,false) AS approved FROM users u LEFT JOIN drivers d ON d.user_id=u.id WHERE u.id=$1"
+          "SELECT u.id,u.name,u.email,u.role,d.online,d.rating,d.today_earnings,d.completed_today,CASE WHEN lower(u.email)='oquinnrj65@gmail.com' THEN true ELSE COALESCE(d.approved,false) END AS approved FROM users u LEFT JOIN drivers d ON d.user_id=u.id WHERE u.id=$1"
         );
       }
       // Keep Richard OQuinn's driver account approved. If the driver row is missing,
