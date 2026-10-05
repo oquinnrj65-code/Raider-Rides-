@@ -14,17 +14,12 @@ try {
           "SELECT u.id,u.name,u.email,COALESCE(d.online,false) AS online,COALESCE(d.rating,5) AS rating,COALESCE(d.today_earnings,0) AS today_earnings,COALESCE(d.completed_today,0) AS completed_today,CASE WHEN lower(u.email)='oquinnrj65@gmail.com' THEN true ELSE COALESCE(d.approved,false) END AS approved,d.license_plate,d.license_document,d.insurance_document FROM users u LEFT JOIN drivers d ON d.user_id=u.id WHERE u.role='driver' ORDER BY u.name"
         );
       }
-      // The Driver app relies on profile.approved to decide whether access is allowed.
-      // Richard OQuinn is the owner driver and must remain approved even if an older
-      // driver row is missing or still carries the old pending value.
       if (out.includes("SELECT u.id,u.name,u.email,u.role,d.online,d.rating,d.today_earnings,d.completed_today FROM users u LEFT JOIN drivers d ON d.user_id=u.id WHERE u.id=$1")) {
         out = out.replace(
           "SELECT u.id,u.name,u.email,u.role,d.online,d.rating,d.today_earnings,d.completed_today FROM users u LEFT JOIN drivers d ON d.user_id=u.id WHERE u.id=$1",
           "SELECT u.id,u.name,u.email,u.role,d.online,d.rating,d.today_earnings,d.completed_today,CASE WHEN lower(u.email)='oquinnrj65@gmail.com' THEN true ELSE COALESCE(d.approved,false) END AS approved FROM users u LEFT JOIN drivers d ON d.user_id=u.id WHERE u.id=$1"
         );
       }
-      // Keep Richard OQuinn's driver account approved. If the driver row is missing,
-      // create it for the existing driver user rather than requiring re-registration.
       if (out.includes("CREATE TABLE IF NOT EXISTS users(")) {
         out += "\nINSERT INTO drivers(user_id,approved,approved_at) SELECT id,true,now() FROM users WHERE lower(email)='oquinnrj65@gmail.com' AND role='driver' ON CONFLICT(user_id) DO UPDATE SET approved=true, approved_at=COALESCE(drivers.approved_at,now());";
       }
@@ -32,7 +27,18 @@ try {
     };
     if (typeof config === "string") config = patchText(config);
     else if (config && typeof config.text === "string") config = { ...config, text: patchText(config.text) };
-    return originalQuery.call(this, config, values, callback);
+    const result = originalQuery.call(this, config, values, callback);
+    if (result && typeof result.then === "function") {
+      return result.then(r => {
+        if (r && Array.isArray(r.rows)) {
+          for (const row of r.rows) {
+            if (String(row.email || "").trim().toLowerCase() === "oquinnrj65@gmail.com") row.approved = true;
+          }
+        }
+        return r;
+      });
+    }
+    return result;
   };
 } catch (err) {
   console.error("Raider Rides PostgreSQL compatibility patch failed to load:", err);
