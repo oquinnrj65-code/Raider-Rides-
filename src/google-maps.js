@@ -2,14 +2,44 @@ let leafletPromise;
 function loadLeaflet(){
  if(window.L)return Promise.resolve(window.L);
  if(leafletPromise)return leafletPromise;
- leafletPromise=new Promise((resolve,reject)=>{const css='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';if(!document.querySelector('link[data-raider-leaflet]')){const link=document.createElement('link');link.rel='stylesheet';link.href=css;link.dataset.raiderLeaflet='1';document.head.appendChild(link)}const script=document.createElement('script');script.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';script.async=true;script.onload=()=>resolve(window.L);script.onerror=()=>reject(new Error('Free map library could not load. Please refresh and try again.'));document.head.appendChild(script)});return leafletPromise
+ leafletPromise=new Promise((resolve,reject)=>{
+  const css='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+  if(!document.querySelector('link[data-raider-leaflet]')){const link=document.createElement('link');link.rel='stylesheet';link.href=css;link.dataset.raiderLeaflet='1';document.head.appendChild(link)}
+  const script=document.createElement('script');script.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';script.onload=()=>window.L?resolve(window.L):reject(new Error('Free map library loaded without Leaflet.'));script.onerror=()=>reject(new Error('Free map library could not load.'));
+  document.head.appendChild(script);
+ });
+ return leafletPromise;
 }
 function point(p){if(!p)return [33.5779,-101.8552];if(Array.isArray(p))return p;if(typeof p.lat==='function')return [Number(p.lat()),Number(p.lng())];return [Number(p.lat),Number(p.lng)]}
-class RaiderMap{constructor(el,o={}){el.style.width='100%';if(!el.style.height)el.style.height='360px';el.style.minHeight='300px';const L=o._leaflet;this._leaflet=L.map(el,{zoomControl:true,attributionControl:true}).setView(point(o.center||{lat:33.5779,lng:-101.8552}),o.zoom||13);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(this._leaflet);this._leaflet.on('click',e=>this._click&&this._click({latLng:{lat:()=>e.latlng.lat,lng:()=>e.latlng.lng}}));setTimeout(()=>this._leaflet.invalidateSize(),50);setTimeout(()=>this._leaflet.invalidateSize(),500);window.addEventListener('resize',()=>this._leaflet.invalidateSize())}setCenter(p){this._leaflet.setView(point(p),this._leaflet.getZoom())}setZoom(z){this._leaflet.setZoom(z)}resize(){this._leaflet.invalidateSize()}addListener(event,fn){if(event!=='click')return{remove(){}};this._click=fn;return{remove:()=>{if(this._click===fn)this._click=null}}}}
-class RaiderMarker{constructor(o={}){this.o=o;this.map=null;this.m=null;if(o.map)this.setMap(o.map)}setMap(map){this.map=map;if(!map){this.m?.remove();this.m=null;return}this.m=window.L.marker(point(this.o.position)).addTo(map._leaflet);if(this.o.title)this.m.bindTooltip(this.o.title)}set position(v){this.o.position=v;if(this.m)this.m.setLatLng(point(v))}get position(){return this.o.position}}
+class RaiderMap{
+ constructor(el,o={}){
+  if(!el)throw new Error('Map container not found.');
+  const L=o._leaflet;
+  el.style.display='block';el.style.width='100%';el.style.height='360px';el.style.minHeight='360px';el.style.position='relative';
+  this._leaflet=L.map(el,{zoomControl:true,attributionControl:true,preferCanvas:false});
+  this._leaflet.setView(point(o.center||{lat:33.5779,lng:-101.8552}),Number(o.zoom)||13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(this._leaflet);
+  this._leaflet.on('click',e=>this._click&&this._click({latLng:{lat:()=>e.latlng.lat,lng:()=>e.latlng.lng}}));
+  const resize=()=>this._leaflet&&this._leaflet.invalidateSize({pan:false});
+  requestAnimationFrame(resize);setTimeout(resize,100);setTimeout(resize,500);setTimeout(resize,1500);
+ }
+ setCenter(p){this._leaflet.setView(point(p),this._leaflet.getZoom(),{animate:false})}
+ setZoom(z){this._leaflet.setZoom(z)}
+ resize(){this._leaflet.invalidateSize({pan:false})}
+ addListener(event,fn){if(event!=='click')return{remove(){}};this._click=fn;return{remove:()=>{if(this._click===fn)this._click=null}}}
+}
+class RaiderMarker{
+ constructor(o={}){this.o=o;this.map=null;this.m=null;if(o.map)this.setMap(o.map)}
+ setMap(map){this.map=map;if(!map){this.m?.remove();this.m=null;return}this.m=window.L.marker(point(this.o.position)).addTo(map._leaflet);if(this.o.title)this.m.bindTooltip(this.o.title)}
+ set position(v){this.o.position=v;if(this.m)this.m.setLatLng(point(v))}
+ get position(){return this.o.position}
+}
 class PlaceValue{constructor(x){this.displayName=x.display_name||'';this.formattedAddress=x.display_name||'';this.location={lat:()=>Number(x.lat),lng:()=>Number(x.lon)}}}
 class Prediction{constructor(x){this.x=x}toPlace(){return new PlaceValue(this.x)}}
-class RaiderPlaces extends HTMLElement{connectedCallback(){if(this.ready)return;this.ready=true;this.style.display='block';this.style.position='relative';const i=document.createElement('input');i.type='text';i.placeholder=this.placeholder||'Search hotels, bars, restaurants, addresses…';i.autocomplete='off';i.style.cssText='width:100%;box-sizing:border-box;padding:12px;border:1px solid #ccc;border-radius:8px';const list=document.createElement('div');list.style.cssText='position:absolute;left:0;right:0;top:100%;z-index:9999;background:#fff;border:1px solid #ddd;border-radius:0 0 8px 8px;box-shadow:0 4px 14px rgba(0,0,0,.15);max-height:260px;overflow:auto';this.input=i;this.list=list;this.append(i,list);let t;i.oninput=()=>{clearTimeout(t);t=setTimeout(()=>this.search(i.value.trim()),350)};i.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();this.search(i.value.trim())}}}async search(q){if(!q){this.list.innerHTML='';return}this.list.innerHTML='<div style="padding:10px">Searching…</div>';try{const r=await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q='+encodeURIComponent(q),{headers:{Accept:'application/json'}});const a=await r.json();this.list.innerHTML='';a.forEach(x=>{const b=document.createElement('button');b.type='button';b.textContent=x.display_name;b.style.cssText='display:block;width:100%;text-align:left;padding:10px;border:0;background:#fff;cursor:pointer';b.onclick=()=>{this.input.value=x.display_name;this.list.innerHTML='';const ev=new Event('gmp-select');ev.placePrediction=new Prediction(x);this.dispatchEvent(ev)};this.list.appendChild(b)});if(!a.length)this.list.innerHTML='<div style="padding:10px">No locations found.</div>'}catch{this.list.innerHTML='<div style="padding:10px">Search unavailable. Enter the address manually.</div>'}}}
+class RaiderPlaces extends HTMLElement{
+ connectedCallback(){if(this.ready)return;this.ready=true;this.style.display='block';this.style.position='relative';const i=document.createElement('input');i.type='text';i.placeholder=this.placeholder||'Search hotels, bars, restaurants, addresses…';i.autocomplete='off';i.style.cssText='width:100%;box-sizing:border-box;padding:12px;border:1px solid #ccc;border-radius:8px';const list=document.createElement('div');list.style.cssText='position:absolute;left:0;right:0;top:100%;z-index:9999;background:#fff;border:1px solid #ddd;border-radius:0 0 8px 8px;box-shadow:0 4px 14px rgba(0,0,0,.15);max-height:260px;overflow:auto';this.input=i;this.list=list;this.append(i,list);let t;i.oninput=()=>{clearTimeout(t);t=setTimeout(()=>this.search(i.value.trim()),350)};i.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();this.search(i.value.trim())}}}
+ async search(q){if(!q){this.list.innerHTML='';return}this.list.innerHTML='<div style="padding:10px">Searching…</div>';try{const r=await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q='+encodeURIComponent(q),{headers:{Accept:'application/json'}});const a=await r.json();this.list.innerHTML='';a.forEach(x=>{const b=document.createElement('button');b.type='button';b.textContent=x.display_name;b.style.cssText='display:block;width:100%;text-align:left;padding:10px;border:0;background:#fff;cursor:pointer';b.onclick=()=>{this.input.value=x.display_name;this.list.innerHTML='';const ev=new Event('gmp-select');ev.placePrediction=new Prediction(x);this.dispatchEvent(ev)};this.list.appendChild(b)});if(!a.length)this.list.innerHTML='<div style="padding:10px">No locations found.</div>'}catch{this.list.innerHTML='<div style="padding:10px">Search unavailable. Enter the address manually.</div>'}}
+}
 if(!customElements.get('raider-place-autocomplete'))customElements.define('raider-place-autocomplete',RaiderPlaces);
 export async function loadGoogleMaps(){const L=await loadLeaflet();if(window.raiderMaps)return window.raiderMaps;window.raiderMaps={importLibrary:async n=>n==='maps'?{Map:(el,o={})=>new RaiderMap(el,{...o,_leaflet:L})}:n==='marker'?{AdvancedMarkerElement:RaiderMarker}:n==='places'?{PlaceAutocompleteElement:class extends RaiderPlaces{}}:{}};return window.raiderMaps}
 export async function createGoogleMap(el,center={lat:33.5779,lng:-101.8552},zoom=13){const maps=await loadGoogleMaps();const{Map}=await maps.importLibrary('maps');const{AdvancedMarkerElement}=await maps.importLibrary('marker');return{maps,map:Map(el,{center,zoom}),AdvancedMarkerElement}}
