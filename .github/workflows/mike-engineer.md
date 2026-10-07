@@ -21,8 +21,19 @@ tools:
 
 safe-outputs:
   create-issue:
+    max: 3
   create-pull-request:
+    max: 1
+    allowed-files:
+      - "src/**"
+      - "server.js"
+      - "package.json"
+      - "package-lock.json"
+      - "test/**"
+      - "tests/**"
+      - "docs/**"
   add-comment:
+    max: 3
 
 max-ai-credits: 500
 
