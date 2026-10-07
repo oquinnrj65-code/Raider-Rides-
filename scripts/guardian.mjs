@@ -8,6 +8,9 @@ const LIVE = {
   admin: "https://raider-rides-admin.onrender.com",
 };
 const failures = [];
+const GUARDIAN_AGENT_NAME = process.env.GUARDIAN_AGENT_NAME || "Mike";
+const ALERT_CONTACT_NAME = process.env.GUARDIAN_CONTACT_NAME || "Richard";
+const ALERT_CONTACT_PHONE = process.env.GUARDIAN_CONTACT_PHONE || "";
 const ok = (name, detail) => console.log("PASS", name, detail || "");
 const fail = (name, detail) => { failures.push({name, detail}); console.error("FAIL", name, detail || ""); };
 async function fetchWithTimeout(url, options = {}, ms = 20000) {
@@ -23,7 +26,8 @@ async function checkSource(path, rules) {
   for (const rule of rules) { if (rule[1].test(text)) ok("source: " + rule[0]); else fail("source: " + rule[0], "Missing required contract in " + path); }
 }
 async function main() {
-  console.log("Raider Rides Guardian starting...");
+  console.log("Raider Rides Guardian (" + GUARDIAN_AGENT_NAME + ") starting...");
+  console.log("Failure alert contact: " + ALERT_CONTACT_NAME + (ALERT_CONTACT_PHONE ? " configured" : " not configured"));
   const health = await checkHttp("API health", LIVE.api + "/api/health");
   if (health) {
     try { const body = await health.json();
@@ -76,7 +80,8 @@ async function main() {
       } catch (e) { fail(name + " browser check", e.message); } finally { await page.close(); }
     }
   } finally { await browser.close(); }
-  console.log("Raider Rides Guardian finished: " + (failures.length ? failures.length + " failure(s)" : "ALL CHECKS PASSED"));
+  console.log("Raider Rides Guardian (" + GUARDIAN_AGENT_NAME + ") finished: " + (failures.length ? failures.length + " failure(s)" : "ALL CHECKS PASSED"));
+  if (failures.length && ALERT_CONTACT_PHONE) console.log("Alert routing: " + GUARDIAN_AGENT_NAME + " -> " + ALERT_CONTACT_NAME + " at configured phone contact");
   if (failures.length) { console.error(JSON.stringify(failures, null, 2)); process.exit(1); }
 }
 main().catch(e => { console.error(e); process.exit(1); });
