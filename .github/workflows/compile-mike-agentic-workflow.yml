@@ -1,0 +1,39 @@
+name: Compile Mike Agentic Workflow
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/mike-engineer.md"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up GitHub CLI
+        uses: cli/gh-action@v2
+
+      - name: Install GitHub Agentic Workflows
+        run: gh extension install github/gh-aw
+
+      - name: Compile Mike
+        run: gh aw compile .github/workflows/mike-engineer.md
+
+      - name: Commit generated lock workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- .github/workflows/mike-engineer.lock.yml; then
+            echo "No lockfile changes."
+            exit 0
+          fi
+          git add .github/workflows/mike-engineer.lock.yml
+          git commit -m "Compile Mike agentic workflow"
+          git push
