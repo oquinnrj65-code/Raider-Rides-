@@ -1,0 +1,66 @@
+name: Raider Rides Guardian
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: raider-rides-guardian
+  cancel-in-progress: true
+
+jobs:
+  guardian:
+    name: AI Guardian - regression and live health
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Raider Rides
+        uses: actions/checkout@v6
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.x
+      - name: Install app dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install Playwright
+        run: npm install --no-save playwright
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run Raider Rides Guardian
+        run: node scripts/guardian.mjs
+      - name: Open a repair issue if Guardian fails
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "🚨 Raider Rides Guardian detected a regression";
+            const body = [
+              "The Raider Rides Guardian detected a failure.",
+              "",
+              "Run: https://github.com/" + context.repo.owner + "/" + context.repo.repo + "/actions/runs/" + context.runId,
+              "Commit: " + context.sha,
+              "",
+              "Review the Guardian logs before changing production code. The Guardian protects the Rider destination field, free map, GPS controls, Driver live events/navigation, API health/Postgres, and the three deployed web apps."
+            ].join("\n");
+            const open = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner, repo: context.repo.repo, state: "open", per_page: 100
+            });
+            if (!open.some(i => i.title === title)) {
+              await github.rest.issues.create({owner: context.repo.owner, repo: context.repo.repo, title, body});
+            }
+      - name: Upload Guardian report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raider-rides-guardian-${{ github.run_number }}
+          path: scripts/guardian.mjs
+          retention-days: 14
