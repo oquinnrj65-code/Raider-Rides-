@@ -6,12 +6,15 @@ on:
     - cron: "47 */6 * * *"
   workflow_dispatch:
 
+engine:
+  id: codex
+  model: openai/gpt-6.1-sol
+
 permissions:
   contents: read
   issues: read
   pull-requests: read
   actions: read
-  copilot-requests: write
 
 network: defaults
 
