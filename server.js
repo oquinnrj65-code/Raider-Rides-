@@ -30,7 +30,7 @@ const decryptDoc=s=>{const [ivB,tagB,dataB]=String(s||"").split(".");if(!ivB||!t
 
 const send=(res,status,data)=>{const o=res.reqOrigin;if(!o||!allowed.length||allowed.includes(o))res.setHeader("Access-Control-Allow-Origin",o||"*");res.setHeader("Vary","Origin");res.setHeader("Access-Control-Allow-Headers","Content-Type,Authorization");res.setHeader("Access-Control-Allow-Methods","GET,POST,PATCH,OPTIONS");res.setHeader("Content-Type","application/json");res.writeHead(status);res.end(JSON.stringify(data))};
 const body=req=>new Promise((resolve,reject)=>{let s="";req.on("data",c=>s+=c);req.on("end",()=>{try{resolve(s?JSON.parse(s):{})}catch(e){reject(e)}})});
-const broadcast=payload=>{const msg="data: "+JSON.stringify(payload)+"\\n\\n";for(const stream of driverStreams){try{stream.write(msg)}catch{driverStreams.delete(stream)}}};
+const broadcast=payload=>{const msg="data: "+JSON.stringify(payload)+"\n\n";for(const stream of driverStreams){try{stream.write(msg)}catch{driverStreams.delete(stream)}}};
 async function saveDriverPushSubscription(userId,subscription){
  const endpoint=String(subscription?.endpoint||"");
  if(!endpoint.startsWith("https://")||!subscription?.keys?.p256dh||!subscription?.keys?.auth)throw Error("Invalid push subscription");
