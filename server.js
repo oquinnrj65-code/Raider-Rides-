@@ -45,10 +45,12 @@ async function removeDriverPushSubscription(userId,endpoint){
 async function sendRidePush(ride){
  if(!ride||ride.status!=="requested"||ride.driverId)return;
  let subscriptions=[];
+ if(pushConfigured){
  if(pool){const r=await q("SELECT s.user_id,s.endpoint,s.subscription FROM driver_push_subscriptions s JOIN drivers d ON d.user_id=s.user_id JOIN users u ON u.id=s.user_id WHERE u.role='driver' AND d.approved=true",[]);subscriptions=r.rows}
  else subscriptions=[...memoryPushSubscriptions.values()].filter(s=>[...memory.users.values()].some(u=>u.id===s.userId&&u.role==="driver")&&memory.drivers.get(s.userId)?.approved!==false);
  const payload=JSON.stringify({type:"ride.created",ride:{id:ride.id,pickup:ride.pickup,destination:ride.destination,fare:ride.fare,rideType:ride.rideType,passengers:ride.passengers},url:DRIVER_APP_URL+"/driver/"});
  await Promise.allSettled(subscriptions.map(async s=>{try{await webpush.sendNotification(s.subscription,payload,{TTL:300,urgency:"high"})}catch(e){if(e?.statusCode===404||e?.statusCode===410)await removeDriverPushSubscription(s.user_id||s.userId,s.endpoint)}}));
+ }
  broadcast({type:"ride.created",ride});
 }
 
