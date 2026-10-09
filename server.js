@@ -43,7 +43,7 @@ async function removeDriverPushSubscription(userId,endpoint){
  else for(const [id,x] of memoryPushSubscriptions)if(x.userId===userId&&x.endpoint===endpoint)memoryPushSubscriptions.delete(id);
 }
 async function sendRidePush(ride){
- if(!pushConfigured||!ride||ride.status!=="requested"||ride.driverId)return;
+ if(!ride||ride.status!=="requested"||ride.driverId)return;
  let subscriptions=[];
  if(pool){const r=await q("SELECT s.user_id,s.endpoint,s.subscription FROM driver_push_subscriptions s JOIN drivers d ON d.user_id=s.user_id JOIN users u ON u.id=s.user_id WHERE u.role='driver' AND d.approved=true",[]);subscriptions=r.rows}
  else subscriptions=[...memoryPushSubscriptions.values()].filter(s=>[...memory.users.values()].some(u=>u.id===s.userId&&u.role==="driver")&&memory.drivers.get(s.userId)?.approved!==false);
