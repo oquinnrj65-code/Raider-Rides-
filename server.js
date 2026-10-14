@@ -23,7 +23,7 @@ const pool=DATABASE_URL?new Pool({connectionString:DATABASE_URL,max:10,idleTimeo
 const memory={users:new Map(),rides:[],drivers:new Map()};
 const driverStreams=new Set();
 const memoryPushSubscriptions=new Map();
-const allowed=(process.env.ALLOWED_ORIGINS||"").split(",").map(x=>x.trim()).filter(Boolean);
+const allowed=[...new Set(["https://raider-rides-rider.onrender.com","https://raider-rides-driver.onrender.com","https://raider-rides-admin.onrender.com",...(process.env.ALLOWED_ORIGINS||"").split(",").map(x=>x.trim()).filter(Boolean)])];
 const DOC_KEY=createHash("sha256").update(AUTH_SECRET).digest();
 const encryptDoc=s=>{const iv=randomBytes(12),cipher=createCipheriv("aes-256-gcm",DOC_KEY,iv);const enc=Buffer.concat([cipher.update(Buffer.from(s,"base64")),cipher.final()]);return iv.toString("base64")+"."+cipher.getAuthTag().toString("base64")+"."+enc.toString("base64")};
 const decryptDoc=s=>{const [ivB,tagB,dataB]=String(s||"").split(".");if(!ivB||!tagB||!dataB)throw Error("Invalid document");const dec=createDecipheriv("aes-256-gcm",DOC_KEY,Buffer.from(ivB,"base64"));dec.setAuthTag(Buffer.from(tagB,"base64"));return Buffer.concat([dec.update(Buffer.from(dataB,"base64")),dec.final()]).toString("base64")};
