@@ -21,6 +21,26 @@ async function checkHttp(name, url, expected = 200) {
   try { const r = await fetchWithTimeout(url); if (r.status !== expected) { fail(name, r.status + " " + r.statusText); return null; } ok(name, r.status + " " + url); return r; }
   catch (e) { fail(name, e.message); return null; }
 }
+async function checkCors(name, origin) {
+  try {
+    const r = await fetchWithTimeout(LIVE.api + "/api/admin/stats", {
+      method: "OPTIONS",
+      headers: {
+        Origin: origin,
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "authorization,content-type",
+      },
+    });
+    const allowedOrigin = r.headers.get("access-control-allow-origin");
+    if (r.status !== 204 || allowedOrigin !== origin) {
+      fail(name + " API CORS", "HTTP " + r.status + "; allow-origin=" + (allowedOrigin || "missing"));
+    } else {
+      ok(name + " API CORS", "preflight allowed for " + origin);
+    }
+  } catch (e) {
+    fail(name + " API CORS", e.message);
+  }
+}
 async function checkSource(path, rules) {
   const text = await fs.readFile(path, "utf8");
   for (const rule of rules) { if (rule[1].test(text)) ok("source: " + rule[0]); else fail("source: " + rule[0], "Missing required contract in " + path); }
@@ -38,6 +58,9 @@ async function main() {
   await checkHttp("Rider app", LIVE.rider + "/");
   await checkHttp("Driver app", LIVE.driver + "/");
   await checkHttp("Admin app", LIVE.admin + "/");
+  await checkCors("Rider", new URL(LIVE.rider).origin);
+  await checkCors("Driver", new URL(LIVE.driver).origin);
+  await checkCors("Admin", new URL(LIVE.admin).origin);
   await checkSource("src/rider.js", [
     ["rider destination host", /id="destinationAutocomplete"/],
     ["rider destination value", /id="destination"[^>]*type="hidden"[^>]*required/],
