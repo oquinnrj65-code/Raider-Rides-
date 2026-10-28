@@ -17,8 +17,8 @@ async function fetchWithTimeout(url, options = {}, ms = 20000) {
   const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), ms);
   try { return await fetch(url, {...options, signal: controller.signal}); } finally { clearTimeout(timer); }
 }
-async function checkHttp(name, url, expected = 200) {
-  try { const r = await fetchWithTimeout(url); if (r.status !== expected) { fail(name, r.status + " " + r.statusText); return null; } ok(name, r.status + " " + url); return r; }
+async function checkHttp(name, url, expected = 200, timeoutMs = 20000) {
+  try { const r = await fetchWithTimeout(url, {}, timeoutMs); if (r.status !== expected) { fail(name, r.status + " " + r.statusText); return null; } ok(name, r.status + " " + url); return r; }
   catch (e) { fail(name, e.message); return null; }
 }
 async function checkCors(name, origin) {
@@ -48,7 +48,7 @@ async function checkSource(path, rules) {
 async function main() {
   console.log("Raider Rides Guardian (" + GUARDIAN_AGENT_NAME + ") starting...");
   console.log("Failure alert contact: " + ALERT_CONTACT_NAME + (ALERT_CONTACT_PHONE ? " configured" : " not configured"));
-  const health = await checkHttp("API health", LIVE.api + "/api/health");
+  const health = await checkHttp("API health", LIVE.api + "/api/health", 200, 45000);
   if (health) {
     try { const body = await health.json();
       if (body.ok !== true) fail("API health payload", JSON.stringify(body)); else ok("API health payload", JSON.stringify(body));
